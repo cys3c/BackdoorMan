@@ -40,6 +40,7 @@ tryagshell
 unknown
 untitled
 uploadshell
+webacoo
 webadmin
 webroot
 weevely

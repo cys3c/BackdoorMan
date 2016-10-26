@@ -1,0 +1,449 @@
+#!/usr/bin/python
+# -*-coding: utf-8 -*-
+
+'''
+Description
+===========
+BackdoorMan is a Python open source toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination, it automates the process of detecting the above.
+
+Purpose
+=======
+The main purpose of BackdoorMan is to help web-masters and developers to discover malicious scripts in their site files, because it is quite common for hackers to place a back-door on a site they have hacked. A back-door can give the hacker continued access to the site even if the site owners change account passwords. Back-door scripts will vary from 100s of lines of code to 1 or 2 lines of code and can be merged in hundreds of files which makes it very hard to discover it, especially if the back-door is inactive. There is common ways and tools that can be used including `grep`, but BackdoorMan automates all the above as described earlier and make it even more easier (at least I hope so).
+
+Requirements
+============
+- Python v2.*
+- requests module
+
+Version
+=======
+BackdoorMan v2.2.0
+
+Author
+======
+Yassine Addi <yassineaddi.dev(at)gmail(dot)com>
+
+Disclaimer
+==========
+...
+
+License
+=======
+BackdoorMan is released under the MIT License <http://www.opensource.org/licenses/mit-license.php>
+
+URI (GitHub)
+============
+<https://github.com/yassineaddi/BackdoorMan>
+
+Options
+=======
+-f, --force				force scan non PHP files
+--no-color				do not use colors in the output
+--no-external-services	do not use external services during scan
+--no-file-info			do not show file information
+
+Features
+========
+- Shells detect by filename using shells signature database.
+- Recognition of web back-doors.
+- Detect the use of suspicious PHP functions and activities.
+- Use of external services beside its functionalities.
+- Use of nimbusec shellray API (free online webshell detect for PHP files <https://shellray.com>).
+	- Very high recognition performance for webshells.
+	- Check suspicious PHP files online.
+	- Easy, fast and reliable.
+	- Classification for webshells with behavior classification.
+	- Free service of nimbusec.
+- Use of VirusTotal Public API (free online service that analyzes files and facilitates the quick detection of viruses, worms, trojans and all kinds of malware), it can be useful in our situation.
+- Use of UnPHP (The online PHP decoder: UnPHP is a free service for analyzing obfuscated and malicious PHP code) <www.unphp.net>. Very useful in our situation.
+	- Eval + gzinflate + Base64.
+	- Recursive De-Obfuscating.
+	- Custom Function and Regex Support.
+
+Changelog
+=========
+v1.0.0		1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
+v2.0.0		- rename software to `BackdoorMan`.
+v2.0.0		- add external services (APIs).
+			- separate databases from main script.
+			- lot of improvements (check 1st release).
+v2.1.0		- separate script to classes to optimize the software.
+v2.2.0		- add `Servicer` class.
+			- rename classes.
+			- add `--no-color` option.
+			- add `--no-external-services` option.
+			- add `--no-file-info` option.
+			- improve `Reporter` class.
+			- improve software interface.
+			- small improvements.
+			- remove single-line and multi-line comments before scanning.
+			- add `--force` option.
+			- add UnPHP API.
+			- improve `activities.txt` database.
+
+TODO
+====
+- Handle special cases of suspicious activities.
+- Add comments.
+- Improve reg-ex(s).
+'''
+
+__license__ 	= '''
+MIT License
+Copyright (c) 2016 Yassine Addi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+'''
+__version__ 	= '2.2.0'
+__author__		= 'Yassine Addi <yassineaddi.dev(at)gmail(dot)com>'
+__description__ = 'A toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination.'
+__usage__		= '%prog [options] destination1 [destination2 ...]'
+
+import os, sys, time, re, socket, requests, json
+from time import sleep
+from datetime import datetime
+from collections import defaultdict
+from optparse import OptionParser
+
+class Initialize:
+	'''Main class.'''
+	def __init__(self, destination):
+		self.destination = destination
+		self.networkReachable = self.isNetworkReachable()
+		self.shells = open('databases/shells.txt', 'rb').read().split('\n')
+		self.functions = '|'.join(open('databases/functions.txt', 'rb').read().split('\n'))
+		self.activities = '|'.join(open('databases/activities.txt', 'rb').read().split('\n'))
+		isFile = os.path.isfile(destination)
+		started = datetime.now()
+		msg = 'Scanning: %s' % destination; report.info(msg)
+		msg = 'Started: %s' % started; report.info(msg)
+		if not isFile:
+			self.list()
+		else:
+			if os.path.splitext(os.path.basename(destination))[1].upper().strip(".") == "PHP" or opts.force:
+				self.PHPScan(destination)
+			else:
+				parser.error('scan of the specified destination is not yet supported')
+		msg = 'Scan Status: Completed'; report.success(msg)
+		ended = datetime.now()
+		msg = 'Ended: %s' % ended; report.info(msg)
+		elapsed = ended - started
+		elapsed = divmod(elapsed.days * 86400 + elapsed.seconds, 60)
+		msg = 'Elapsed: %s Minutes, %s Seconds' % (elapsed[0], elapsed[1]); report.info(msg)
+
+	def list(self):
+		'''Recursively list files and launch scan.
+		'''
+		for dirpath, dirnames, filenames in os.walk(self.destination):
+		    for filename in filenames:
+		    	file = os.path.join(dirpath, filename)
+		    	#Used upper() instead of lower() for readability reasons.
+		    	if os.path.splitext(filename)[1].upper().strip(".") == "PHP" or opts.force:
+		    		#Send to analyze.
+		    		self.PHPScan(file)
+
+	def PHPScan(self, file):
+		'''Scan executer.
+		'''
+		filename = os.path.basename(file)
+		f = self.prepare(open(file, 'rb').read())
+		#Detect web shells by signature database.
+		for shell in self.shells:
+			if shell in filename.lower():
+				msg = 'Suspicious File Name: %s' % filename; report.danger(msg)
+				for val in self.getFileInfo(file):
+					report.child(val)
+
+		#Detect suspicious functions and activities.
+		for i, line in enumerate(f.split('\n')):
+			results = re.findall(r'(?si)(%s)' % self.functions, line)
+			if results:
+				for result in results:
+					msg = 'Suspicious Function: %s' % filename; report.danger(msg)
+					msg = 'Function Name: %s' % result; report.child(msg)
+					msg = 'Line Number: %i' % int(i+1); report.child(msg)
+					for val in self.getFileInfo(file):
+						report.child(val)
+			results = re.findall(r'(?si)(%s)' % self.activities, line)
+			if results:
+				for result in results:
+					msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
+					msg = 'Activity: %s' % result; report.child(msg)
+					msg = 'Line Number: %i' % int(i+1); report.child(msg)
+					for val in self.getFileInfo(file):
+						report.child(val)
+
+		#Handle special cases of suspicious activities.
+		#Search for backticks(``) outside quotes. Please note,
+		#PHP will attempt to execute the contents of the backticks as a shell command.
+		#Head to <http://php.net/manual/en/language.operators.execution.php>.
+		pattern = r"(\".*?\"|\'.*?\')|(`[^`]*`)"
+		regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
+		def _r(m):
+			if (m.group(2)):
+				msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
+				msg = 'Activity: %s' % m.group(2); report.child(msg)
+				msg = 'Threat Name: PHP Execution Operator'; report.child(msg)
+				for val in self.getFileInfo(file):
+					report.child(val)
+		regex.sub(_r, f)
+
+		#Decode and de-obfuscate PHP script if network is reachable and re-scan.
+		if self.networkReachable and opts.services:
+			servicer = Servicer(f)
+			data = servicer.unphp()
+			if data:
+				r = requests.get(data['output'])
+				f = self.prepare(r.content)
+				for line in f.split('\n'):
+					results = re.findall(r'(?si)(%s)' % self.functions, line)
+					if results:
+						for result in results:
+							msg = 'Suspicious Function: %s' % filename; report.danger(msg)
+							msg = 'Function Name: %s' % result; report.child(msg)
+							msg = 'Service Provider: UnPHP'; report.child(msg)
+							for val in self.getFileInfo(file):
+								report.child(val)
+					results = re.findall(r'(?si)(%s)' % self.activities, line)
+					if results:
+						for result in results:
+							msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
+							msg = 'Activity: %s' % result; report.child(msg)
+							msg = 'Service Provider: UnPHP'; report.child(msg)
+							for val in self.getFileInfo(file):
+								report.child(val)
+
+		#Use external services as backup if network is reachable.
+		if self.networkReachable and opts.services:
+			servicer = Servicer(open(file, 'r'))
+			response = servicer.shellray()
+			if response:
+				msg = 'Malware Detected: %s' % filename; report.danger(msg)
+				msg = 'Service Provider: shellray'; report.child(msg)
+				msg = 'Threat Name: %s' % str(response['threatname']); report.child(msg)
+				msg = 'SHA1: %s' % str(response['sha1']); report.child(msg)
+				msg = 'MD5: %s' % str(response['md5']); report.child(msg)
+				for val in self.getFileInfo(file):
+					report.child(val)
+			response = servicer.virustotal()
+			if response:
+				results = [response['scans'][antivirus]['result'] for antivirus in response['scans'] if response['scans'][antivirus]['detected']]
+				msg = 'Malware Detected: %s' % filename; report.danger(msg)
+				msg = 'Service Provider: virustotal'; report.child(msg)
+				msg = 'Detection Ratio: %i / %i' % (response['positives'], response['total']); report.child(msg)
+				msg = 'Results: %s' % ', '.join(results); report.child(msg)
+				for val in self.getFileInfo(file):
+					report.child(val)
+
+	def prepare(self, string):
+		'''Returns a prepared source for scan process.
+		string: The PHP source to analyze.
+		'''
+		preparedString = self.removeComments(string)
+		return preparedString
+
+	def removeComments(self, string):
+		'''Returns a free-comments PHP string.
+		string: The PHP string to analyze.
+		'''
+		#link: <http://stackoverflow.com/questions/2319019/using-regex-to-remove-comments-from-source-files>
+		#author: Onur Yıldırım <https://github.com/onury>
+
+		pattern = r"(\".*?\"|\'.*?\')|(/\*.*?\*/|#[^\r\n]*$|//[^\r\n]*$)"
+		regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
+		def _replacer(match):
+			if match.group(2):
+				return "\n"*(len(match.group(2).split('\n'))-1)
+			return match.group(1)
+		return regex.sub(_replacer, string)
+
+	def getFileInfo(self, file):
+		'''Returns file information.
+		'''
+		(mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(file)
+		if not opts.info:
+			return []
+		return [
+			"Full Path: %s" % file,
+			"Owner: %s" % ((str)(uid) + ":" + str(gid)),
+			"Permission: %s" % ((oct)(mode)[-3:]),
+			"Last Accessed: %s" % ((time).ctime(atime)),
+			"Last Modified: %s" % ((time).ctime(mtime)),
+			"File Size: %s" % ((self).humanReadableFilesize(size))
+		]
+
+	def humanReadableFilesize(self, filesize, suffix='B'):
+		'''Returns a human readable filesize.
+		filesize: filesize to humanize.
+		suffix: string to append at the end of unit. Defaults to 'B'.
+		'''
+		for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
+			if abs(filesize) < 1024.0:
+				return "%3.1f%s%s" % (filesize, unit, suffix)
+			filesize /= 1024.0
+		return "%.1f%s%s" % (filesize, 'Yi', suffix)
+
+	def isNetworkReachable(self):
+		'''Returns weather network is reachable or not.
+		'''
+		try:
+			#Google's IP address.
+			host, _, addrList = socket.gethostbyaddr('216.58.192.142')
+			s = socket.create_connection((addrList[0], 80), 2)
+			return True
+		except:
+			return False
+
+class Servicer:
+	'''Servicer class services the use of external services (APIs).'''
+	def __init__(self, file):
+		self.file = file
+		self.config = json.load(open('config.js', 'r'))
+
+	def shellray(self):
+		#Service Provider: <http://shellray.com>.
+		try:
+			r = requests.post('https://shellray.com/upload', files={'file':self.file})
+			data = r.json()
+			if not data['infected']:
+				return False
+			return data
+		except requests.ConnectionError:
+			return False
+
+	def virustotal(self):
+		#Service Provider: <http://virustotal.com>.
+		apikey = self.config['VirusTotal_apikey']
+		if apikey == '':
+			return False
+		try:
+			r = requests.post('https://virustotal.com/vtapi/v2/file/scan', data={'apikey': apikey}, files={'file':self.file})
+			data = r.json()
+			if data['response_code'] == 0:
+				return False
+			sleep(3)
+			r = requests.post("https://www.virustotal.com/vtapi/v2/file/report", data={"apikey":apikey, "resource":data["resource"]})
+			try:
+				data = r.json()
+			except:
+				return False
+			if data['response_code'] == 0 or data['positives'] == 0:
+				return False
+			return data
+		except requests.ConnectionError:
+			return False
+
+	def unphp(self):
+		'''Returns decoded and de-obfuscated PHP script.
+		'''
+		#Service Provider: <http://www.unphp.net>.
+		apikey = self.config['UnPHP_apikey']
+		if apikey == '':
+			return False
+		try:
+			r = requests.post('http://www.unphp.net/api/v2/post', files={
+				'file':self.file}, data={'api_key':apikey})
+			data = r.json()
+			if data['result'] == 'error':
+				return False
+			return data
+		except requests.ConnectionError:
+			return False
+
+class Reporter:
+	'''Reporter class is responsible for outputting software messages.'''
+	def __init__(self, color=True):
+		#Taken from Django.
+		plat = sys.platform
+		supportedPlatform = plat != 'Pocket PC' and (plat != 'win32' or 'ANSICON' in os.environ)
+		isatty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+		#True if the running system's terminal supports color, and False otherwise.
+		self.supportsColor = False if not supportedPlatform or not isatty or not color else True
+	def danger(self, msg):
+		spl = map(str.strip, msg.split(':'))
+		if self.supportsColor:
+			print('\033[91m[!] %s\033[0m: %s' % (spl[0], spl[1]))
+		else:
+			print('[!] ' + msg)
+
+	def info(self, msg):
+		spl = map(str.strip, msg.split(':'))
+		if self.supportsColor:
+			print('\033[94m[*] %s\033[0m: %s' % (spl[0], spl[1]))
+		else:
+			print('[*] ' + msg)
+
+	def success(self, msg):
+		spl = map(str.strip, msg.split(':'))
+		if self.supportsColor:
+			print('\033[92m[+] %s\033[0m: %s' % (spl[0], spl[1]))
+		else:
+			print('[+] ' + msg)
+
+	def warning(self, msg):
+		spl = map(str.strip, msg.split(':'))
+		if self.supportsColor:
+			print('\033[93m[-] %s\033[0m: %s' % (spl[0], spl[1]))
+		else:
+			print('[-] ' + msg)
+
+	def child(self, msg):
+		spl = map(str.strip, msg.split(':'))
+		if self.supportsColor:
+			print(' |  \033[36m%s\033[0m: %s' % (spl[0], spl[1]))
+		else:
+			print(' |  ' + msg)
+
+if __name__ == '__main__':
+	#Command line arguments.
+	parser = OptionParser(usage=__usage__, description=__description__, version=__version__)
+	parser.add_option('-f', '--force',
+					dest='force',
+					action='store_true',
+					default=False,
+					help='force scan non PHP files')
+	parser.add_option('--no-color',
+					dest='color',
+					action='store_false',
+					default=True,
+					help='do not use colors in the output')
+	parser.add_option('--no-file-info',
+					dest='info',
+					action='store_false',
+					default=True,
+					help='do not show file information')
+	parser.add_option('--no-external-services',
+					dest='services',
+					action='store_false',
+					default=True,
+					help='do not use external services during scan')
+	(opts, args) = parser.parse_args(sys.argv[1:])
+	if not args:
+		parser.error('no destination supplied')
+	report = Reporter(opts.color)
+	for dest in args:
+		if not os.path.exists(dest):
+			parser.error('the specified path does not exist: \'%s\'' % dest)
+		try:
+			#Start!
+			Initialize(dest)
+		except KeyboardInterrupt:
+			print('')
+			msg = 'Scan Status: Aborted'; report.warning(msg)
+			sys.exit()
