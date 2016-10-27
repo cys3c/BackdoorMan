@@ -72,7 +72,7 @@ class Initialize:
 		    		self.PHPScan(file)
 
 	def PHPScan(self, file):
-		'''Scan executer.
+		'''Scan launcher.
 		'''
 		filename = os.path.basename(file)
 		f = self.prepare(open(file, 'rb').read())
@@ -172,7 +172,7 @@ class Initialize:
 		return preparedString
 
 	def removeComments(self, string):
-		'''Returns a free-comments PHP string.
+		'''Returns a removed comments PHP string.
 		string: The PHP string to analyze.
 		'''
 		#link: <http://stackoverflow.com/questions/2319019/using-regex-to-remove-comments-from-source-files>
