@@ -1,12 +1,12 @@
-# BackdoorMan
+# BackdoorMan (Under active development)
 
-## Description
+### Description
 A Python open source toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination, it automates the process of detecting the above.
 
-## Purpose
+### Purpose
 The main purpose of `BackdoorMan` is to help web-masters and developers to discover malicious scripts in their site files, because it is quite common for hackers to place a back-door on a site they have hacked. A back-door can give the hacker continued access to the site even if the site owners change account passwords. Back-door scripts will vary from 100s of lines of code to 1 or 2 lines of code and can be merged in hundreds of files which makes it very hard to discover it, especially if the back-door is inactive. There is common ways and tools that can be used including `grep`, but `BackdoorMan` automates all the above as described earlier and make it even more easier (at least I hope so).
 
-## Features
+### Features
 - Shells detect by filename using shells signature database.
 - Recognition of web back-doors.
 - Detect the use of suspicious PHP functions and activities.
@@ -23,22 +23,21 @@ The main purpose of `BackdoorMan` is to help web-masters and developers to disco
 	- Recursive De-Obfuscating.
 	- Custom Function and Regex Support.
 
-## Requirements
-- Python v2.* at least
+### Requirements
 - requests module
 
-## Version
-v2.2.0
+### Version
+`v2.2.1`
 
-## Author
+### Author
 Yassine Addi <yassineaddi.dev(at)gmail(dot)com>
 
-## Disclaimer
+### Disclaimer
 
-## License
+### License
 `BackdoorMan` is released under the [MIT License](http://www.opensource.org/licenses/mit-license.php).
 
-## Usage
+### Usage
 ```
 Usage: BackdoorMan [options] destination1 [destination2 ...]
 
@@ -55,15 +54,15 @@ Options:
                         do not use external services during scan
 ```
 
-## Changelog
+### Changelog
 ```
-v1.0.0		1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
-v2.0.0		- rename software to `BackdoorMan`.
-v2.0.0		- add external services (APIs).
+v1.0.0    1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
+v2.0.0    - rename software to `BackdoorMan`.
+v2.0.0    - add external services (APIs).
           - separate databases from main script.
           - lot of improvements (check 1st release).
-v2.1.0		- separate script to classes to optimize the software.
-v2.2.0		- add `Servicer` class.
+v2.1.0    - separate script to classes to optimize the software.
+v2.2.0    - add `Servicer` class.
           - rename classes.
           - add `--no-color` option.
           - add `--no-external-services` option.
@@ -75,9 +74,10 @@ v2.2.0		- add `Servicer` class.
           - add `--force` option.
           - add UnPHP API.
           - improve `activities.txt` database.
+v2.2.1    - modify comments.
 ```
 
-## TODO
+### TODO
 ```
 - Handle special cases of suspicious activities.
 - Add comments.
