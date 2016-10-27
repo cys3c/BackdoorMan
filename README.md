@@ -56,7 +56,7 @@ Options:
 
 ### Changelog
 ```
-v1.0.0    1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
+v1.0.0    - 1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
 v2.0.0    - rename software to `BackdoorMan`.
           - improve external services (APIs).
           - separate databases from main script.
