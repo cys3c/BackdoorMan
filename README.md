@@ -11,14 +11,14 @@ The main purpose of `BackdoorMan` is to help web-masters and developers to disco
 - Recognition of web back-doors.
 - Detect the use of suspicious PHP functions and activities.
 - Use of external services beside its functionalities.
-- Use of nimbusec shellray API (free online webshell detect for PHP files <https://shellray.com>).
+- Use of nimbusec shellray API (free online webshell detect for PHP files https://shellray.com).
   - Very high recognition performance for webshells.
   - Check suspicious PHP files online.
   - Easy, fast and reliable.
   - Classification for webshells with behavior classification.
   - Free service of nimbusec.
 - Use of VirusTotal Public API (free online service that analyzes files and facilitates the quick detection of viruses, worms, trojans and all kinds of malware), it can be useful in our situation.
-- Use of UnPHP (The online PHP decoder: UnPHP is a free service for analyzing obfuscated and malicious PHP code) <www.unphp.net>. Very useful in our situation.
+- Use of UnPHP (The online PHP decoder: UnPHP is a free service for analyzing obfuscated and malicious PHP code) www.unphp.net. Very useful in our situation.
 	- Eval + gzinflate + Base64.
 	- Recursive De-Obfuscating.
 	- Custom Function and Regex Support.
@@ -30,7 +30,7 @@ The main purpose of `BackdoorMan` is to help web-masters and developers to disco
 `v2.2.1`
 
 ### Author
-Yassine Addi <yassineaddi.dev(at)gmail(dot)com>
+Yassine Addi
 
 ### Disclaimer
 
@@ -58,9 +58,9 @@ Options:
 ```
 v1.0.0    1st release <https://github.com/yassineaddi/PHP-backdoor-detector>.
 v2.0.0    - rename software to `BackdoorMan`.
-v2.0.0    - add external services (APIs).
+          - improve external services (APIs).
           - separate databases from main script.
-          - lot of improvements (check 1st release).
+          - lot of improvements (compare with 1st release).
 v2.1.0    - separate script to classes to optimize the software.
 v2.2.0    - add `Servicer` class.
           - rename classes.
