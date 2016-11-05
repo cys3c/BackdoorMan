@@ -1,0 +1,11 @@
+\bcreate_function\b
+\bgzip\b
+\bgzinflate\b
+\bchmod\b
+\breadfile\b
+\bfclose\b
+\bfopen\b
+\bmkdir\b
+\bshow_source\b
+\btcpflood\b
+\budpflood\b

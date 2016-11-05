@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*-coding: utf-8 -*-
 
+# +==================+
+# | Global Variables |
+# +==================+
+
 __license__ 	= '''
 MIT License
 Copyright (c) 2016 Yassine Addi
@@ -23,9 +27,9 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 '''
-__version__     = '2.2.1'
+__version__     = '2.3.1'
 __author__      = 'Yassine Addi <yassineaddi.dev(at)gmail(dot)com>'
-__description__ = 'A toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination.'
+__description__ = 'A toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination.\r\nAuthor: %s.\r\nNOTE: This tool does not require Internet connection but it is highly recommended to benefit from all features.' % __author__
 __usage__       = '%prog [options] destination1 [destination2 ...]'
 
 import os, sys, time, re, socket, requests, json
@@ -38,27 +42,51 @@ class Initialize:
 	'''Main class.'''
 	def __init__(self, destination):
 		self.destination = destination
-		self.networkReachable = self.isNetworkReachable()
+		self.totalThreats = 0
+		self.isNR = self.isNetworkReachable()
 		self.shells = open('databases/shells.txt', 'rb').read().split('\n')
-		self.functions = '|'.join(open('databases/functions.txt', 'rb').read().split('\n'))
-		self.activities = '|'.join(open('databases/activities.txt', 'rb').read().split('\n'))
+
+		self.lowFuncts = '|'.join(
+			open('databases/functions/low.txt', 'rb').read().strip().split('\n')
+		)
+		self.mediumFuncts = '|'.join(
+			open('databases/functions/medium.txt', 'rb').read().strip().split('\n')
+		)
+		self.highFuncts = '|'.join(
+			open('databases/functions/high.txt', 'rb').read().strip().split('\n')
+		)
+		self.lowActivs = '|'.join(
+			open('databases/activities/low.txt', 'rb').read().strip().split('\n')
+		)
+		self.mediumActivs = '|'.join(
+			open('databases/activities/medium.txt', 'rb').read().strip().split('\n')
+		)
+		self.highActivs = '|'.join(
+			open('databases/activities/high.txt', 'rb').read().strip().split('\n')
+		)
+
 		isFile = os.path.isfile(destination)
 		started = datetime.now()
-		msg = 'Scanning: %s' % destination; report.info(msg)
-		msg = 'Started: %s' % started; report.info(msg)
+		msg = ['Scanning', destination]; report.status(msg)
+		msg = ['Started', started]; report.status(msg)
+		if opts.output:
+			msg = ['Saving', report.fn]; report.status(msg)
 		if not isFile:
 			self.list()
 		else:
-			if os.path.splitext(os.path.basename(destination))[1].upper().strip(".") == "PHP" or opts.force:
+			if os.path.splitext(os.path.basename(destination))[1].upper().strip(".") == "PHP":
 				self.PHPScan(destination)
 			else:
 				parser.error('scan of the specified destination is not yet supported')
-		msg = 'Scan Status: Completed'; report.success(msg)
+		if self.totalThreats > 0:
+			msg = '%i threat(s) detected in the scanned destination.' % self.totalThreats
+			print(report.bmagenta + msg + report.end)
+			report.writeTextFile(msg)
 		ended = datetime.now()
-		msg = 'Ended: %s' % ended; report.info(msg)
+		msg = ['Ended', ended]; report.status(msg)
 		elapsed = ended - started
 		elapsed = divmod(elapsed.days * 86400 + elapsed.seconds, 60)
-		msg = 'Elapsed: %s Minutes, %s Seconds' % (elapsed[0], elapsed[1]); report.info(msg)
+		msg = ['Elapsed', '%s Minutes, %s Seconds' % (elapsed[0], elapsed[1])]; report.status(msg)
 
 	def list(self):
 		'''Recursively list files and launch scan.
@@ -66,117 +94,283 @@ class Initialize:
 		for dirpath, dirnames, filenames in os.walk(self.destination):
 		    for filename in filenames:
 		    	file = os.path.join(dirpath, filename)
-		    	#Used upper() instead of lower() for readability reasons.
-		    	if os.path.splitext(filename)[1].upper().strip(".") == "PHP" or opts.force:
-		    		#Send to analyze.
+		    	if os.path.splitext(filename)[1].upper().strip(".") == "PHP":
 		    		self.PHPScan(file)
 
 	def PHPScan(self, file):
-		'''Scan launcher.
-		'''
 		filename = os.path.basename(file)
+		fileThreats = {}
 		f = self.prepare(open(file, 'rb').read())
-		#Detect web shells by signature database.
+		string = ''.join(f.split('\n'))
+		# +====================+
+		# | Step 1: Web Shells |
+		# +--------------------+
+		# | detect web shells  |
+		# | using a signature  |
+		# | database.          |
+		# +====================+
 		for shell in self.shells:
 			if shell in filename.lower():
-				msg = 'Suspicious File Name: %s' % filename; report.danger(msg)
+				self.totalThreats += 1
+				msg = ['Suspicious File Name', filename]; report.medium(msg)
 				for val in self.getFileInfo(file):
 					report.child(val)
 
-		#Detect suspicious functions and activities.
+		# +==========================+
+		# |  Step 2: Scan of Source  |
+		# +--------------------------+
+		# | detect the use of        |
+		# | suspicious or critical   |
+		# | functions and activities.|
+		# +==========================+
 		for i, line in enumerate(f.split('\n')):
-			results = re.findall(r'(?si)(%s)' % self.functions, line)
-			if results:
-				for result in results:
-					msg = 'Suspicious Function: %s' % filename; report.danger(msg)
-					msg = 'Function Name: %s' % result; report.child(msg)
-					msg = 'Line Number: %i' % int(i+1); report.child(msg)
-					for val in self.getFileInfo(file):
-						report.child(val)
-			results = re.findall(r'(?si)(%s)' % self.activities, line)
-			if results:
-				for result in results:
-					msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
-					msg = 'Activity: %s' % result; report.child(msg)
-					msg = 'Line Number: %i' % int(i+1); report.child(msg)
-					for val in self.getFileInfo(file):
-						report.child(val)
+			if self.lowFuncts:
+				results = re.findall(r'(?si)(%s)' % self.lowFuncts, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Function', filename]; report.low(msg)
+						msg = ['Function Name', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+			if self.mediumFuncts:
+				results = re.findall(r'(?si)(%s)' % self.mediumFuncts, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Function', filename]; report.medium(msg)
+						msg = ['Function Name', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+			if self.highFuncts:
+				results = re.findall(r'(?si)(%s)' % self.highFuncts, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Function', filename]; report.high(msg)
+						msg = ['Function Name', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+			if self.lowActivs:
+				results = re.findall(r'(?si)(%s)' % self.lowActivs, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Activity', filename]; report.low(msg)
+						msg = ['Activity', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+			if self.mediumActivs:
+				results = re.findall(r'(?si)(%s)' % self.mediumActivs, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Activity', filename]; report.medium(msg)
+						msg = ['Activity', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+			if self.highActivs:
+				results = re.findall(r'(?si)(%s)' % self.highActivs, line)
+				if results:
+					for result in results:
+						fileThreats[result] = file
+						self.totalThreats += 1
+						msg = ['Suspicious Activity', filename]; report.high(msg)
+						msg = ['Activity', result]; report.child(msg)
+						msg = ['Line Number', i+1]; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
 
-		#Handle special cases of suspicious activities.
-		#Search for backticks(``) outside quotes. Please note,
-		#PHP will attempt to execute the contents of the backticks as a shell command.
-		#Head to <http://php.net/manual/en/language.operators.execution.php>.
-		pattern = r"(\".*?\"|\'.*?\')|(`[^`]*`)"
-		regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
-		def _r(m):
-			if (m.group(2)):
-				msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
-				msg = 'Activity: %s' % m.group(2); report.child(msg)
-				msg = 'Threat Name: PHP Execution Operator'; report.child(msg)
-				for val in self.getFileInfo(file):
-					report.child(val)
-		regex.sub(_r, f)
+		# +=================================+
+		# |   Step 3: Handle Special Cases  |
+		# +---------------------------------+
+		# | 1.detect the use of `` outside  |
+		# |   quotes. Please note that PHP  |
+		# |   will attempt to execute them  |
+		# |   as execution operator same as |
+		# |   shell_exec() function.        |
+		# +=================================+
+		qt, sq, sb, bs = None, False, False, ''
+		for i, r in enumerate(string):
+			if r in ['"', "'"]:
+				if not sq:
+					sq, qt = True, r
+				else:
+					if qt == r:
+						if string[i-1] != '\\':
+							sq, qt = False, None
+			elif r == '`':
+				if not sq:
+					if sb:
+						self.totalThreats += 1
+						msg = ['Suspicious Activity', filename]; report.high(msg)
+						msg = ['Activity', '`' + bs + '`']; report.child(msg)
+						for val in self.getFileInfo(file):
+							report.child(val)
+						bs, sb = '', False
+					else:
+						sb = True
+			if sb and r != '`':
+				bs += r
 
-		#Decode and de-obfuscate PHP script if network is reachable and re-scan.
-		if self.networkReachable and opts.services:
+		# +=================================+
+		# |    Step 4: Re-Scan of Source    |
+		# +---------------------------------+
+		# | same as Step 4, but in this step|
+		# | we'll decode and de-obfuscate   |
+		# | and then re-launch the scan     |
+		# | process, and we'll not output   |
+		# | already reported threats.       |
+		# | Please note that you need       |
+		# | Internet connection.            |
+		# +=================================+
+		if self.isNR and opts.apis:
 			servicer = Servicer(f)
 			data = servicer.unphp()
 			if data:
 				r = requests.get(data['output'])
 				f = self.prepare(r.content)
 				for line in f.split('\n'):
-					results = re.findall(r'(?si)(%s)' % self.functions, line)
-					if results:
-						for result in results:
-							msg = 'Suspicious Function: %s' % filename; report.danger(msg)
-							msg = 'Function Name: %s' % result; report.child(msg)
-							msg = 'Service Provider: UnPHP'; report.child(msg)
-							for val in self.getFileInfo(file):
-								report.child(val)
-					results = re.findall(r'(?si)(%s)' % self.activities, line)
-					if results:
-						for result in results:
-							msg = 'Suspicious Activity: %s' % filename; report.danger(msg)
-							msg = 'Activity: %s' % result; report.child(msg)
-							msg = 'Service Provider: UnPHP'; report.child(msg)
-							for val in self.getFileInfo(file):
-								report.child(val)
+					if self.lowFuncts:
+						results = re.findall(r'(?si)(%s)' % self.lowFuncts, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Function', filename]; report.low(msg)
+									msg = ['Function Name', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
+					if self.mediumFuncts:
+						results = re.findall(r'(?si)(%s)' % self.mediumFuncts, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Function', filename]; report.medium(msg)
+									msg = ['Function Name', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
+					if self.highFuncts:
+						results = re.findall(r'(?si)(%s)' % self.highFuncts, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Function', filename]; report.high(msg)
+									msg = ['Function Name', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
+					if self.lowActivs:
+						results = re.findall(r'(?si)(%s)' % self.lowActivs, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Activity', filename]; report.low(msg)
+									msg = ['Activity', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
+					if self.mediumActivs:
+						results = re.findall(r'(?si)(%s)' % self.mediumActivs, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Activity', filename]; report.medium(msg)
+									msg = ['Activity', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
+					if self.highActivs:
+						results = re.findall(r'(?si)(%s)' % self.highActivs, line)
+						if results:
+							for result in results:
+								dis = True
+								if result in fileThreats:
+									if fileThreats[result] == file:
+										dis = False
+								if dis:
+									self.totalThreats += 1
+									msg = ['Suspicious Activity', filename]; report.high(msg)
+									msg = ['Activity', result]; report.child(msg)
+									for val in self.getFileInfo(file):
+										report.child(val)
 
-		#Use external services as backup if network is reachable.
-		if self.networkReachable and opts.services:
+		# +=================================+
+		# |    Step 5: External Services    |
+		# +---------------------------------+
+		# | use external services (APIs) as |
+		# | backup if network is reachable. |
+		# +=================================+
+		if self.isNR and opts.apis:
 			servicer = Servicer(open(file, 'r'))
 			response = servicer.shellray()
 			if response:
-				msg = 'Malware Detected: %s' % filename; report.danger(msg)
-				msg = 'Service Provider: shellray'; report.child(msg)
-				msg = 'Threat Name: %s' % str(response['threatname']); report.child(msg)
-				msg = 'SHA1: %s' % str(response['sha1']); report.child(msg)
-				msg = 'MD5: %s' % str(response['md5']); report.child(msg)
+				self.totalThreats += 1
+				msg = ['Malware Detected', filename]; report.high(msg)
+				msg = ['Service Provider', 'shellray']; report.child(msg)
+				msg = ['Threat Name', response['threatname']]; report.child(msg)
+				msg = ['SHA1', response['sha1']]; report.child(msg)
+				msg = ['MD5', response['md5']]; report.child(msg)
 				for val in self.getFileInfo(file):
 					report.child(val)
 			response = servicer.virustotal()
 			if response:
+				self.totalThreats += 1
 				results = [response['scans'][antivirus]['result'] for antivirus in response['scans'] if response['scans'][antivirus]['detected']]
-				msg = 'Malware Detected: %s' % filename; report.danger(msg)
-				msg = 'Service Provider: virustotal'; report.child(msg)
-				msg = 'Detection Ratio: %i / %i' % (response['positives'], response['total']); report.child(msg)
-				msg = 'Results: %s' % ', '.join(results); report.child(msg)
+				msg = ['Malware Detected', filename]; report.high(msg)
+				msg = ['Service Provider', 'virustotal']; report.child(msg)
+				msg = ['Detection Ratio', '%i / %i' % (response['positives'], response['total'])]; report.child(msg)
+				msg = ['Results', ', '.join(results)]; report.child(msg)
 				for val in self.getFileInfo(file):
 					report.child(val)
 
 	def prepare(self, string):
-		'''Returns a prepared source for scan process.
-		string: The PHP source to analyze.
+		'''Returns a prepared string for scan process.
+		string: The PHP string to analyze.
 		'''
 		preparedString = self.removeComments(string)
 		return preparedString
 
 	def removeComments(self, string):
-		'''Returns a removed comments PHP string.
+		'''Returns a free of comments PHP string using regex.
 		string: The PHP string to analyze.
 		'''
-		#link: <http://stackoverflow.com/questions/2319019/using-regex-to-remove-comments-from-source-files>
-		#author: Onur Yıldırım <https://github.com/onury>
+		# +===========================================================+
+		# | Link:   <http://stackoverflow.com/questions/2319019/      |
+		# |         using-regex-to-remove-comments-from-source-files> |
+		# | Author: Onur Yıldırım <https://github.com/onury>          |
+		# +===========================================================+
 
 		pattern = r"(\".*?\"|\'.*?\')|(/\*.*?\*/|#[^\r\n]*$|//[^\r\n]*$)"
 		regex = re.compile(pattern, re.MULTILINE|re.DOTALL)
@@ -187,36 +381,28 @@ class Initialize:
 		return regex.sub(_replacer, string)
 
 	def getFileInfo(self, file):
-		'''Returns file information.
-		'''
 		(mode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime) = os.stat(file)
 		if not opts.info:
 			return []
 		return [
-			"Full Path: %s" % file,
-			"Owner: %s" % ((str)(uid) + ":" + str(gid)),
-			"Permission: %s" % ((oct)(mode)[-3:]),
-			"Last Accessed: %s" % ((time).ctime(atime)),
-			"Last Modified: %s" % ((time).ctime(mtime)),
-			"File Size: %s" % ((self).humanReadableFilesize(size))
+			['Full Path'    , file],
+			['Owner'        , ((str)(uid) + ':' + str(gid))],
+			['Permission'   , ((oct)(mode)[-3:])],
+			['Last Accessed', ((time).ctime(atime))],
+			['Last Modified', ((time).ctime(mtime))],
+			['File Size'    , ((self).humanReadableFilesize(size))]
 		]
 
 	def humanReadableFilesize(self, filesize, suffix='B'):
-		'''Returns a human readable filesize.
-		filesize: filesize to humanize.
-		suffix: string to append at the end of unit. Defaults to 'B'.
-		'''
 		for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
 			if abs(filesize) < 1024.0:
-				return "%3.1f%s%s" % (filesize, unit, suffix)
+				return '%3.1f%s%s' % (filesize, unit, suffix)
 			filesize /= 1024.0
-		return "%.1f%s%s" % (filesize, 'Yi', suffix)
+		return '%.1f%s%s' % (filesize, 'Yi', suffix)
 
 	def isNetworkReachable(self):
-		'''Returns weather network is reachable or not.
-		'''
 		try:
-			#Google's IP address.
+			# Google's IP address.
 			host, _, addrList = socket.gethostbyaddr('216.58.192.142')
 			s = socket.create_connection((addrList[0], 80), 2)
 			return True
@@ -230,7 +416,17 @@ class Servicer:
 		self.config = json.load(open('config.js', 'r'))
 
 	def shellray(self):
-		#Service Provider: <http://shellray.com>.
+		# +=========================================+
+		# | Service Provider: <http://shellray.com> |
+		# +-----------------------------------------+
+		# | 1.very high recognition performance for |
+		# |   webshells.                            |
+		# | 2.check suspicious PHP files online.    |
+		# | 3.easy, fast and reliable.              |
+		# | 4.classification for webshells with     |
+		# |   behavior classification.              |
+		# | 5.free services of nimbusec.            |
+		# +=========================================+
 		try:
 			r = requests.post('https://shellray.com/upload', files={'file':self.file})
 			data = r.json()
@@ -241,7 +437,13 @@ class Servicer:
 			return False
 
 	def virustotal(self):
-		#Service Provider: <http://virustotal.com>.
+		# +===========================================+
+		# | Service Provider: <http://virustotal.com> |
+		# +-------------------------------------------+
+		# | 1.eval + gzinflate + base64.              |
+		# | 2.recursive de-obfuscating.               |
+		# | 3.custom function and regex support.      |
+		# +===========================================+
 		apikey = self.config['VirusTotal_apikey']
 		if apikey == '':
 			return False
@@ -263,9 +465,11 @@ class Servicer:
 			return False
 
 	def unphp(self):
-		'''Returns decoded and de-obfuscated PHP script.
-		'''
-		#Service Provider: <http://www.unphp.net>.
+		# +==========================================+
+		# | Service Provider: <http://www.unphp.net> |
+		# +------------------------------------------+
+		# | returns decoded and de-obfuscated script |
+		# +==========================================+
 		apikey = self.config['UnPHP_apikey']
 		if apikey == '':
 			return False
@@ -282,70 +486,111 @@ class Servicer:
 class Reporter:
 	'''Reporter class is responsible for outputting software messages.'''
 	def __init__(self, color=True):
-		#Taken from Django.
+		self.fn = opts.output
+		self.log = ' '.join(sys.argv)
+		# Colors.
+		self.red      = ''
+		self.bred     = ''
+		self.bmagenta = ''
+		self.cyan     = ''
+		self.yellow   = ''
+		self.orange   = ''
+		self.blue     = ''
+		self.end      = ''
+		# Taken from Django.
 		plat = sys.platform
 		supportedPlatform = plat != 'Pocket PC' and (plat != 'win32' or 'ANSICON' in os.environ)
 		isatty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
-		#True if the running system's terminal supports color, and False otherwise.
-		self.supportsColor = False if not supportedPlatform or not isatty or not color else True
-	def danger(self, msg):
-		spl = map(str.strip, msg.split(':'))
-		if self.supportsColor:
-			print('\033[91m[!] %s\033[0m: %s' % (spl[0], spl[1]))
-		else:
-			print('[!] ' + msg)
+		# True if the running system's terminal supports color, and False otherwise.
+		supportsColor = False if not supportedPlatform or not isatty or not color else True
+		if supportsColor:
+			self.red      = '\033[31m'
+			self.bred     = '\033[41m'
+			self.bmagenta = '\033[45m'
+			self.cyan     = '\033[96m'
+			self.yellow   = '\033[93m'
+			self.orange   = '\033[38;5;208m'
+			self.blue     = '\033[94m'
+			self.end      = '\033[0m'
 
-	def info(self, msg):
-		spl = map(str.strip, msg.split(':'))
-		if self.supportsColor:
-			print('\033[94m[*] %s\033[0m: %s' % (spl[0], spl[1]))
+	def status(self, msg):
+		self.writeTextFile('[*] ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		if type(msg) == list:
+			msg = self.blue + '[*] ' + msg[0] + self.end + ': ' + str(msg[1])
 		else:
-			print('[*] ' + msg)
+			msg = self.blue + '[*] ' + msg + self.end
+		print(msg)
 
-	def success(self, msg):
-		spl = map(str.strip, msg.split(':'))
-		if self.supportsColor:
-			print('\033[92m[+] %s\033[0m: %s' % (spl[0], spl[1]))
+	def error(self, msg):
+		self.writeTextFile('[ERROR] ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		if type(msg) == list:
+			msg = self.bred + '[ERROR] ' + msg[0] + self.end + ': ' + str(msg[1])
 		else:
-			print('[+] ' + msg)
-
-	def warning(self, msg):
-		spl = map(str.strip, msg.split(':'))
-		if self.supportsColor:
-			print('\033[93m[-] %s\033[0m: %s' % (spl[0], spl[1]))
-		else:
-			print('[-] ' + msg)
+			msg = self.bred + '[ERROR] ' + msg + self.end
+		print(msg)
 
 	def child(self, msg):
-		spl = map(str.strip, msg.split(':'))
-		if self.supportsColor:
-			print(' |  \033[36m%s\033[0m: %s' % (spl[0], spl[1]))
+		self.writeTextFile(' |  ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		msg = ' |  ' + self.cyan + msg[0] + self.end + ': ' + str(msg[1])
+		print(msg)
+
+	def low(self, msg):
+		self.writeTextFile('[L] ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		if type(msg) == list:
+			msg = self.yellow + '[L] ' + msg[0] + self.end + ': ' + str(msg[1])
 		else:
-			print(' |  ' + msg)
+			msg = self.yellow + '[L] ' + msg + self.end
+		print(msg)
+
+	def medium(self, msg):
+		self.writeTextFile('[M] ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		if type(msg) == list:
+			msg = self.orange + '[M] ' + msg[0] + self.end + ': ' + str(msg[1])
+		else:
+			msg = self.orange + '[M] ' + msg + self.end
+		print(msg)
+
+	def high(self, msg):
+		self.writeTextFile('[H] ' + (msg[0] + ': ' + str(msg[1])) if type(msg) == list else msg)
+		if type(msg) == list:
+			msg = self.red + '[H] ' + msg[0] + self.end + ': ' + str(msg[1])
+		else:
+			msg = self.red + '[H] ' + msg + self.end
+		print(msg)
+
+	def writeTextFile(self, msg):
+		if opts.output:
+			self.log += '\n' + msg
+			f = open(self.fn, 'w')
+			f.write(self.log)
+			f.close()
+
+class MyParser(OptionParser):
+	'''MyParser class overrides OptionParser class.'''
+	def format_description(self, formatter):
+		return self.description + '\n'
 
 if __name__ == '__main__':
-	#Command line arguments.
-	parser = OptionParser(usage=__usage__, description=__description__, version=__version__)
-	parser.add_option('-f', '--force',
-					dest='force',
-					action='store_true',
-					default=False,
-					help='force scan non PHP files')
+	# Command line arguments.
+	parser = MyParser(usage=__usage__, description=__description__, version=__version__)
+	parser.add_option('-o', '--output',
+					dest='output',
+					help='save output in a file')
 	parser.add_option('--no-color',
 					dest='color',
 					action='store_false',
 					default=True,
 					help='do not use colors in the output')
-	parser.add_option('--no-file-info',
+	parser.add_option('--no-info',
 					dest='info',
 					action='store_false',
 					default=True,
 					help='do not show file information')
-	parser.add_option('--no-external-services',
-					dest='services',
+	parser.add_option('--no-apis',
+					dest='apis',
 					action='store_false',
 					default=True,
-					help='do not use external services during scan')
+					help='do not use APIs during scan (not recommended)')
 	(opts, args) = parser.parse_args(sys.argv[1:])
 	if not args:
 		parser.error('no destination supplied')
@@ -354,9 +599,9 @@ if __name__ == '__main__':
 		if not os.path.exists(dest):
 			parser.error('the specified path does not exist: \'%s\'' % dest)
 		try:
-			#Start!
+			# Start!
 			Initialize(dest)
 		except KeyboardInterrupt:
 			print('')
-			msg = 'Scan Status: Aborted'; report.warning(msg)
+			msg = 'Interrupt caught: exiting...'; report.error(msg)
 			sys.exit()

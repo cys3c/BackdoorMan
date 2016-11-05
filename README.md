@@ -27,7 +27,7 @@ The main purpose of `BackdoorMan` is to help web-masters and developers to disco
 - requests module
 
 ### Version
-`v2.2.1`
+`v2.3.1`
 
 ### Author
 Yassine Addi
@@ -41,17 +41,18 @@ Yassine Addi
 ```
 Usage: BackdoorMan [options] destination1 [destination2 ...]
 
-A toolkit that helps you find malicious, hidden and suspicious PHP scripts and
-shells in a chosen destination.
+A toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination.
+Author: Yassine Addi <yassineaddi.dev(at)gmail(dot)com>.
+NOTE: This tool does not require Internet connection but it is highly recommended to benefit from all features.
 
 Options:
   --version             show program's version number and exit
   -h, --help            show this help message and exit
-  -f, --force           force scan non PHP files
+  -o OUTPUT, --output=OUTPUT
+                        save output in a file
   --no-color            do not use colors in the output
-  --no-file-info        do not show file information
-  --no-external-services
-                        do not use external services during scan
+  --no-info             do not show file information
+  --no-apis             do not use APIs during scan (not recommended)
 ```
 
 ### Changelog
@@ -75,6 +76,13 @@ v2.2.0    - add `Servicer` class.
           - add UnPHP API.
           - improve `activities.txt` database.
 v2.2.1    - modify comments.
+v2.3.1    - use of custom parser instead of reg-ex to detect backticks (execution operator)
+            due to false positives.
+          - improved report class.
+          - separate functions and activities to low, medium and high...
+          - rename options.
+          - add `-o, --output` option.
+          - add/modify comments.
 ```
 
 ### TODO

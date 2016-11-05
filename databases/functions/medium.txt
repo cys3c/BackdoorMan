@@ -1,0 +1,11 @@
+\bbase64_decode\b
+\bedoced_46esab\b
+\bpython_exec\b
+\bphpinfo\b
+\bstr_rot13\b
+\bparse_ini_file\b
+\bcurl_multi_exec\b
+\bcurl_exec\b
+\bphp_uname\b
+\bproc_open\b
+\bpopen\b
