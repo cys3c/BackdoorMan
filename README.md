@@ -1,4 +1,4 @@
-# BackdoorMan (Under active development)
+# BackdoorMan
 
 ### Description
 A Python open source toolkit that helps you find malicious, hidden and suspicious PHP scripts and shells in a chosen destination, it automates the process of detecting the above.
