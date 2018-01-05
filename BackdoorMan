@@ -428,7 +428,14 @@ class Servicer:
 		# | 5.free services of nimbusec.            |
 		# +=========================================+
 		try:
-			r = requests.post('https://shellray.com/upload', files={'file':self.file})
+			while 1:
+				try:
+					r = requests.post('https://shellray.com/upload', files={'file':self.file})
+					if r.status_code is 200:
+						break
+				except:
+					pass
+				sleep(0.5)
 			data = r.json()
 			if not data['infected']:
 				return False
