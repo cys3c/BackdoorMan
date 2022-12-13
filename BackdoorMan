@@ -44,25 +44,25 @@ class Initialize:
 		self.destination = destination
 		self.totalThreats = 0
 		self.isNR = self.isNetworkReachable()
-		self.shells = open('databases/shells.txt', 'rb').read().split('\n')
+		self.shells = open('databases/shells.txt', 'r').read().split('\n')
 
 		self.lowFuncts = '|'.join(
-			open('databases/functions/low.txt', 'rb').read().strip().split('\n')
+			open('databases/functions/low.txt', 'r').read().strip().split('\n')
 		)
 		self.mediumFuncts = '|'.join(
-			open('databases/functions/medium.txt', 'rb').read().strip().split('\n')
+			open('databases/functions/medium.txt', 'r').read().strip().split('\n')
 		)
 		self.highFuncts = '|'.join(
-			open('databases/functions/high.txt', 'rb').read().strip().split('\n')
+			open('databases/functions/high.txt', 'r').read().strip().split('\n')
 		)
 		self.lowActivs = '|'.join(
-			open('databases/activities/low.txt', 'rb').read().strip().split('\n')
+			open('databases/activities/low.txt', 'r').read().strip().split('\n')
 		)
 		self.mediumActivs = '|'.join(
-			open('databases/activities/medium.txt', 'rb').read().strip().split('\n')
+			open('databases/activities/medium.txt', 'r').read().strip().split('\n')
 		)
 		self.highActivs = '|'.join(
-			open('databases/activities/high.txt', 'rb').read().strip().split('\n')
+			open('databases/activities/high.txt', 'r').read().strip().split('\n')
 		)
 
 		isFile = os.path.isfile(destination)
@@ -100,7 +100,7 @@ class Initialize:
 	def PHPScan(self, file):
 		filename = os.path.basename(file)
 		fileThreats = {}
-		f = self.prepare(open(file, 'rb').read())
+		f = self.prepare(open(file, 'r').read())
 		string = ''.join(f.split('\n'))
 		# +====================+
 		# | Step 1: Web Shells |
